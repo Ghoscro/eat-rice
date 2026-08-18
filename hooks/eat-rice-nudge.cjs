@@ -2,6 +2,8 @@
 /**
  * eat-rice-nudge — 吃饭自动触发 hook（PostToolUse）
  *
+ * 路径：sakurabot/skills/eat-rice/hooks/eat-rice-nudge.cjs
+ *
  * 机制：
  * 1. 每次 PostToolUse 事件计数 +1（按 session_id 隔离）
  * 2. 连续 >= THRESHOLD 轮工具调用未与用户对话 → 向 agent 注入
@@ -9,18 +11,15 @@
  * 3. 注入后计数清零 + 冷却 COOLDOWN_MS，防刷屏
  * 4. hook 是 nudge 不是强制：context 里保留"检索无增量可跳过"的判断余地
  *
- * 可调参数（环境变量）：
- *   EAT_RICE_THRESHOLD    连续多少轮工具调用触发，默认 8
- *   EAT_RICE_COOLDOWN_MIN 两次提醒最小间隔（分钟），默认 10
- *
- * 兼容 Claude Code 系客户端（~/.claude/settings.json）与 WorkBuddy（~/.workbuddy/settings.json）。
+ * 由 WorkBuddy（~/.workbuddy/settings.json）与 cc-haha（~/.claude/settings.json）
+ * 的 hooks.PostToolUse 调用。脚本在本 skill 目录内 = 家的一部分，git 可管。
  */
 
 const fs = require("node:fs");
 const path = require("node:path");
 
-const THRESHOLD = parseInt(process.env.EAT_RICE_THRESHOLD || "8", 10) || 8;
-const COOLDOWN_MS = (parseInt(process.env.EAT_RICE_COOLDOWN_MIN || "10", 10) || 10) * 60 * 1000;
+const THRESHOLD = 8;        // 连续 N 轮工具调用 → 提醒吃饭
+const COOLDOWN_MS = 10 * 60 * 1000; // 两次提醒最小间隔 10 分钟
 
 const STATE_FILE = path.join(__dirname, "state.json");
 
@@ -58,11 +57,11 @@ process.stdin.on("end", () => {
       hookEventName: "PostToolUse",
       additionalContext:
         "🍚 eat-rice 自动触发：本会话已连续 " + THRESHOLD + "+ 轮工具调用未与用户对话。" +
-        "按 eat-rice skill（skills/eat-rice/SKILL.md）进入吃饭流程：" +
-        "① 宣示'我去吃个饭🍚'（1-2 句，说清吃什么菜）→ " +
-        "② 用可用搜索工具跑任务相关检索（菜色A 补素材 查询≤5 / 菜色B 核查产出事实）→ " +
-        "③ 汇报'吃饱了🍚'并立刻接回主线。" +
-        "判断余地：若当前检索对主线无明确增量、或 5 轮内刚吃过，可跳过本次（反表演原则，不为吃而吃）。",
+        "按 eat-rice skill（skills/eat-rice/SKILL.md）进入吃饭流程——吃饭是路由器，按任务当下最大缺口选菜：" +
+        "① 宣示'我去吃个饭🍚'（说清路由到什么菜）→ " +
+        "② 吃真实的一餐：🍜检索饭(缺外部信息) / 🔍核查饭(产出有硬断言) / 🥗复盘饭(刚完成阶段) / 🍱规划饭(下步不明) / 🍚复盘+规划套餐(无明显单一缺口) → " +
+        "③ 汇报'吃饱了🍚'+ 记 meal-log.md 账本 + 立刻接回主线。" +
+        "没有空路由：每顿必须路由到真实劳动；唯一不开饭的情形是上下文快满（先压缩）。",
     },
   };
   process.stdout.write(JSON.stringify(response));
