@@ -150,6 +150,32 @@ hook 支持两个环境变量（在 `settings.json` 的 `env` 字段或系统环
 
 hook 是 **nudge 不是强制**：注入的提醒保留了判断余地——若当前检索对主线无明确增量、或刚吃过，agent 会跳过本次（反表演原则）。毕竟每 8 轮必吃一次，就成另一种表演了。
 
+## 给 AI Agent 的使用说明（如果你是 agent，读这里）
+
+**这是什么**：一个 Claude Code 系 skill（SKILL.md 格式，纯 Markdown + 一个 Node hook 脚本），让 agent 在长任务中自然地说"我去吃个饭🍚"，并用那几分钟真实干活（检索/核查/复盘/规划），回来汇报成果继续主线。
+
+**怎么安装（按你的客户端对号入座）**：
+
+| 你的环境 | 安装方式 |
+|---|---|
+| Claude Code / 任何读 `~/.claude/skills/` 的 agent | 把本仓库放进 `~/.claude/skills/eat-rice/`，可选配置 hook（见下） |
+| WorkBuddy / 任何读 `~/.workbuddy/skills/` 的 agent | 放进 `~/.workbuddy/skills/eat-rice/`，同上 |
+| 其他 IDE agent（Codex / Cursor / Trae / Gemini CLI 等） | 没有 skill 目录机制也没关系——直接把 `SKILL.md` 全文读进上下文（或贴进你的系统提示 / rules 文件），行为规范即生效 |
+| 想要自动触发 | 需客户端支持 Claude Code 式 hooks（PostToolUse 事件）：往 `settings.json` 注入 `hooks.PostToolUse` 指向 `hooks/eat-rice-nudge.cjs`（需 Node ≥16）；不支持 hooks 的环境用关键词手动触发 |
+
+**触发逻辑**：
+- 自动：hook 计数，连续 ≥8 轮工具调用未与用户对话 → 注入"该吃饭了"提醒（阈值用环境变量 `EAT_RICE_THRESHOLD` 调，冷却 `EAT_RICE_COOLDOWN_MIN`）
+- 手动：用户说出"去吃饭吧 / 吃个饭再继续 / 干饭去"，或 agent 自判命中触发条件
+
+**运行逻辑（三幕剧）**：
+1. **宣示**——说"我去吃个饭🍚"+ 说清这餐吃什么菜
+2. **路由**——按任务当下最大缺口选菜：🍜麻辣烫(素材收集) / 🥟饺子(事实核查) / 🍳蛋炒饭(复盘对齐) / 🍗黄焖鸡米饭(规划排布) / 🥡沙县三件套(复盘+规划)；用可用的搜索工具或纯思考完成
+3. **回归**——固定格式汇报"吃饱了🍚"（吃到什么 / 增量 / 下一口）+ 追加一条到 `meal-log.md` 账本 + **立刻接回主线**
+
+**红线**：没有空路由（每顿必须真实劳动）、不虚构成果、不开新任务、饭量控制（检索 ≤5 查询、≤3 深读）。
+
+**验证装好了**：让 agent 连续干 8+ 轮工具调用的活，看它是否自动说"我去吃个饭🍚"；或直接说"去吃饭吧"看是否进入三幕剧。
+
 ## FAQ
 
 **Q：没有联网搜索工具能用吗？**
