@@ -2,17 +2,15 @@
 /**
  * eat-rice-nudge — 吃饭自动触发 hook（PostToolUse）
  *
- * 路径：sakurabot/skills/eat-rice/hooks/eat-rice-nudge.cjs
- *
  * 机制：
  * 1. 每次 PostToolUse 事件计数 +1（按 session_id 隔离）
  * 2. 连续 >= THRESHOLD 轮工具调用未与用户对话 → 向 agent 注入
- *    additionalContext："该吃饭了"，agent 按 eat-rice skill 三幕剧执行
+ *    additionalContext："该吃饭了"，agent 按 eat-rice skill 路由器流程执行
  * 3. 注入后计数清零 + 冷却 COOLDOWN_MS，防刷屏
- * 4. hook 是 nudge 不是强制：context 里保留"检索无增量可跳过"的判断余地
+ * 4. 没有空路由：提醒里带菜单，检索/核查/复盘/规划总有一样是任务当下缺的
  *
- * 由 WorkBuddy（~/.workbuddy/settings.json）与 cc-haha（~/.claude/settings.json）
- * 的 hooks.PostToolUse 调用。脚本在本 skill 目录内 = 家的一部分，git 可管。
+ * 兼容 Claude Code 系客户端（~/.claude/settings.json）与 WorkBuddy（~/.workbuddy/settings.json），
+ * 由各客户端的 hooks.PostToolUse 调用。脚本随 skill 目录安装。
  */
 
 const fs = require("node:fs");
