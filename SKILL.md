@@ -11,7 +11,7 @@ metadata:
   origin: 2026-08-18 · v2.1 菜名映射为真实好吃饭（麻辣烫/饺子/蛋炒饭/黄焖鸡米饭/沙县三件套）
   depends:
     - 任意可用搜索工具（anysearch / WebSearch / WebFetch / 内置联网搜索，仅路由到检索类菜时需要）
-  auto_trigger: hooks/eat-rice-nudge.cjs（PostToolUse 计数器，连续≥8轮自动注入提醒）
+  auto_trigger: hooks/eat-rice-nudge.cjs（可选 PostToolUse 计数器，达到阈值后注入提醒）
   meal_log: meal-log.md（吃饭账本，每餐一条，append-only，供复盘迭代路由质量）
   aliases:
     - 我去吃个饭
@@ -44,11 +44,11 @@ agent 干活干到一半说"我去吃个饭"，用户等几分钟，agent 回来
 ## 什么时候开饭（触发规则）
 
 **自动触发（主通道）**：`hooks/eat-rice-nudge.cjs` 挂在 PostToolUse 上，
-每次工具调用计数 +1，连续 ≥8 轮未与用户对话 → 自动注入"该吃饭了"。看到注入即按三幕剧执行。
+每次 PostToolUse 事件计数 +1，累计达到阈值后自动注入“该吃饭了”。看到注入即按三幕剧执行。
 
 **手动/兜底触发**：满足以下任一条件时主动开吃：
 
-1. **连续高强度 ≥8 轮工具调用**，期间没跟用户说过话——该给用户一个喘息窗口了
+1. **当前宿主的可选 PostToolUse 计数器达到阈值**——该给任务一个复盘或补料窗口了
 2. **刚完成一个大阶段**（写完一个模块 / 出完一版方案）
 3. 用户明说："去吃饭吧" / "吃个饭再继续" / "干饭去"
 

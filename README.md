@@ -1,199 +1,111 @@
-# eat-rice 🍚 — 让 Agent 的"我去吃个饭"变成真实劳动
+# eat-rice 🍚
 
-> **吃饭 = 路由器。入口恒定："我去吃个饭🍚"。出口百变：这一餐吃什么，任务说了算。**
-> **永远有饭吃：有缺口就有菜。路由器没有空路由——每顿都路由到真实劳动。**
+把 Agent 的“我去吃个饭”从纯表演变成真实劳动。
 
-## 这是什么
+吃饭是一个小路由器：根据当前任务最大的缺口，选择检索、事实核查、复盘或规划；回来汇报增量，并继续主线。
 
-你的 AI agent 干活干到一半说：**"我去吃个饭🍚，回来接着干。"**
+## 仓库结构
 
-大部分 agent 的"吃饭"是纯表演——说完就愣着，或者干脆编一段"吃完了"。`eat-rice` 不一样：吃饭是一个**路由器**，agent 宣示吃饭后，按任务当下的最大缺口自动选菜，真实地干几分钟活，回来端上成果：
-
-```
-agent：主线先放着，我去吃个饭🍚——这一餐吃个蛋炒饭，复盘一下刚才那版方案偏没偏，回来接着改。
-（接下来的几分钟，agent 在真实地复盘对齐 / 检索 / 规划）
-agent：吃饱了🍚。这一餐吃的是复盘饭（路由依据：刚完成一个阶段）：
-       - 做完了：X、Y；偏航了：Z 多做了一层没必要的抽象
-       - 对主线的增量：砍掉 Z，下一阶段直接对接 W
-       - 下一口：把 Z 的回滚代码补上
-（记账到 meal-log.md，然后立刻继续主线工作）
+```text
+eat-rice/
+├── SKILL.md                    # Skill 真源
+├── hooks/eat-rice-nudge.cjs    # 可选：PostToolUse 自动提醒
+└── references/HOOKS.md         # 可选 hook 的手动配置参考
 ```
 
-## 菜单（路由表）
+仓库不提供安装脚本，也不会自动修改你的 IDE 配置。手动触发只需要 `SKILL.md`；不需要自动提醒时，不要配置 hook。
 
-菜名映射的是人类真正好吃又划算的饭——神韵对应：
+## 安装前先看风险
 
-| 任务当下的信号 | 路由到 | 这一餐干什么 |
-|---|---|---|
-| 下一阶段需要外部信息 | 🍜 麻辣烫 · 素材收集（自选料一锅捞） | 并行搜索补素材（≤5 查询、深读 ≤3 篇） |
-| 产出含硬断言（数据/版本/引文） | 🥟 饺子 · 事实核查（一颗颗咬开验馅） | 逐条交叉验证，标 ✅确认/⚠️存疑/❌推翻 |
-| 刚完成一个阶段 | 🍳 蛋炒饭 · 复盘对齐（剩饭回锅越炒越香） | 对照目标：做完了什么/偏航没/漏了什么 |
-| 下一阶段不明朗、优先级不清 | 🍗 黄焖鸡米饭 · 规划排布（肉饭汤菜一套配齐） | 拆下一步：顺序/依赖/风险/验收标准 |
-| 连续高强度但无明显单一缺口 | 🥡 沙县三件套 · 复盘+规划（拌面+扁肉+炖罐） | 先复盘对齐，再定下三步（零外部依赖） |
+- Skill 会引导 Agent 做真实检索、核查、复盘或规划，可能消耗联网额度、token 和时间；每餐默认限制为检索不超过 5 次、深读不超过 3 篇。
+- 可选 hook 是本地 Node.js 命令，会在每次 `PostToolUse` 后运行，并把计数状态写到 `hooks/state.json`。它不读取密钥，也不联网，但仍属于会执行的本地代码，请先自行审阅。
+- `meal-log.md` 可能留下任务摘要。涉密任务只记菜色，不记内容；不想留痕时可明确要求跳过账本。
+- 不同宿主的 Skill 目录和 hook 协议不同。安装 Skill 不等于自动 hook 已生效；不要把 Claude Code 的 hook 配置硬塞给 Codex、DSH 或其他不兼容宿主。
+- `git pull` 会取得仓库的新版本。对稳定环境可固定到已审阅的 commit，再手动升级。
 
-检索类菜需要联网搜索工具；不可用时自动改吃思考类菜（复盘/规划），不硬编。
-路由表是启发式不是穷举——遇到新缺口可以发明新菜，只要是真实劳动。
+## 安装 Skill
 
-## 吃饭账本（meal-log.md）
+把整个仓库放进宿主能发现的 Skill 目录。目录名保持为 `eat-rice`，并确保入口最终是：
 
-每餐一条，append-only：时间 / 菜色（路由依据）/ 吃到什么 / 增量 / 下一口。
-**账本越厚，路由越准**——回头看吃过什么，哪道菜值、哪道菜水、什么任务该吃什么菜。
+```text
+<skills-root>/eat-rice/SKILL.md
+```
 
-## 核心特性
+### 通用跨宿主位置
 
-- 🍚 **吃饭 = 百变路由器**：入口恒定（我去吃个饭🍚），出口按任务缺口现场路由
-- 🧾 **吃饭账本**：每餐记账，复盘迭代路由质量
-- ⚙️ **自动触发**：PostToolUse hook 计数器，连续 ≥8 轮工具调用没理你时自动开饭
-- 🛡️ **没有空路由**：每顿必须路由到真实劳动；检索结果必须真实（不端空盘子）
-- 🔧 **零依赖也能吃**：检索饭要网，复盘饭/规划饭只要思考
-- 🖥️ **多客户端**：Claude Code / WorkBuddy / 任何 Claude Code 兼容客户端
-
-## 快速开始
-
-### 依赖
-
-- [Node.js](https://nodejs.org) ≥ 16（hook 脚本用）
-- 一个支持 hooks 的 Claude Code 系客户端（仅自动触发需要；纯手动触发可不装 hook）
-
-### 一键安装
-
-**macOS / Linux / Git Bash：**
+许多 Agent Skills 兼容宿主会扫描 `~/.agents/skills/`：
 
 ```bash
-git clone https://github.com/Ghoscro/eat-rice.git /tmp/eat-rice
-bash /tmp/eat-rice/install.sh
+git clone https://github.com/Ghoscro/eat-rice.git ~/.agents/skills/eat-rice
 ```
-
-**Windows PowerShell：**
 
 ```powershell
-git clone https://github.com/Ghoscro/eat-rice.git $env:TEMP\eat-rice
-& "$env:TEMP\eat-rice\install.ps1"
+git clone https://github.com/Ghoscro/eat-rice.git "$env:USERPROFILE\.agents\skills\eat-rice"
 ```
 
-安装脚本会：
-1. 把 skill 复制到你客户端的用户级 skills 目录（自动检测 Claude Code `~/.claude/skills` / WorkBuddy `~/.workbuddy/skills`，也可 `--target` 指定）
-2. 向对应 `settings.json` 安全合并 `hooks.PostToolUse` 配置（不会动你已有的 hook）
+如果你的宿主没有扫描这个目录，使用下表中的原生位置。
 
-### 手动安装（如果你更喜欢自己动手）
+| 宿主 | 用户级位置 | 项目级位置 | 自动 hook |
+|---|---|---|---|
+| Claude Code | `~/.claude/skills/eat-rice/` | `<project>/.claude/skills/eat-rice/` | 可选，见 `references/HOOKS.md` |
+| WorkBuddy | `~/.workbuddy/skills/eat-rice/` | 由当前客户端配置决定 | 兼容 Claude Code hooks 时可选 |
+| Codex App / CLI | `~/.codex/skills/eat-rice/` 或 `~/.agents/skills/eat-rice/` | 由当前 Codex 版本的项目 Skill 规则决定 | 本仓库不提供 Codex 自动 hook；用手动触发 |
+| DeepSeek Harness | `~/.dsh/skills/eat-rice/` 或 `~/.agents/skills/eat-rice/` | `<project>/.dsh/skills/eat-rice/` 或 `<project>/.agents/skills/eat-rice/` | 本仓库不是 DSH 插件；用手动触发 |
+| Cursor | `~/.cursor/skills/eat-rice/` 或 `~/.agents/skills/eat-rice/` | `<project>/.cursor/skills/eat-rice/` 或 `<project>/.agents/skills/eat-rice/` | 不使用本仓库的 Claude Code hook 配置 |
+| GitHub Copilot / VS Code Agent | `~/.copilot/skills/eat-rice/` 或 `~/.agents/skills/eat-rice/` | `<project>/.github/skills/eat-rice/` 或 `<project>/.agents/skills/eat-rice/` | 按 Copilot 自己的 hook 机制配置 |
+| 其他 IDE Agent | 优先尝试 `~/.agents/skills/eat-rice/` | 优先尝试 `<project>/.agents/skills/eat-rice/` | 无兼容协议时只用手动触发 |
 
-1. 复制本仓库到你的 skills 目录：
+安装或更新后，按宿主要求重启会话，让它重新发现 Skill。
 
-```bash
-# Claude Code
-git clone https://github.com/Ghoscro/eat-rice.git ~/.claude/skills/eat-rice
-# WorkBuddy
-git clone https://github.com/Ghoscro/eat-rice.git ~/.workbuddy/skills/eat-rice
+## 验证
+
+在新会话中说：
+
+```text
+去吃饭吧，回来继续当前任务。
 ```
 
-2. 在你客户端的 `settings.json`（Claude Code：`~/.claude/settings.json`；WorkBuddy：`~/.workbuddy/settings.json`）中加入：
+成功时，Agent 应按三幕执行：
 
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node <你的skills目录>/eat-rice/hooks/eat-rice-nudge.cjs",
-            "timeout": 15
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+1. 宣示这一餐路由到什么菜；
+2. 完成一项对当前主线有增量的真实劳动；
+3. 用“吃饱了🍚”汇报结果，并接回主线。
 
-> 只想要手动触发（说"去吃饭吧"才吃）？跳过第 2 步即可，skill 本身就是完整可用的。
+如果宿主看不到 Skill，先检查路径是否多套了一层目录，以及 `SKILL.md` 的文件名和 YAML frontmatter 是否完整。
 
-## 验证安装
+## 可选自动提醒
 
-```bash
-# hook 冒烟测试：连跑 8 次应输出一段 JSON（第 8 次触发）
-for i in 1 2 3 4 5 6 7 8; do
-  echo '{"session_id":"smoke-test"}' | node ~/.claude/skills/eat-rice/hooks/eat-rice-nudge.cjs
-done
-rm ~/.claude/skills/eat-rice/hooks/state.json
-```
+自动提醒仅适用于支持 Claude Code 风格 `PostToolUse` hooks 的宿主。配置、风险、验证和移除方式见 [`references/HOOKS.md`](references/HOOKS.md)。
 
-然后开一个新会话，随便让 agent 干个连续使用工具 8 轮以上的活——你会看到它自己说"我去吃个饭🍚"，然后真的去查资料，回来汇报"吃饱了🍚"并继续干活。
+不确定是否兼容时，不配置 hook。手动说“去吃饭吧”已经能使用全部核心能力。
 
-## 配置
+## 菜单
 
-hook 支持两个环境变量（在 `settings.json` 的 `env` 字段或系统环境变量里设置）：
-
-| 变量 | 默认 | 说明 |
+| 当前缺口 | 菜色 | 真实劳动 |
 |---|---|---|
-| `EAT_RICE_THRESHOLD` | `8` | 连续多少轮工具调用触发"吃饭" |
-| `EAT_RICE_COOLDOWN_MIN` | `10` | 两次"吃饭"提醒的最小间隔（分钟） |
+| 缺外部信息 | 🍜 麻辣烫 | 素材收集 |
+| 有硬断言待验证 | 🥟 饺子 | 事实核查 |
+| 刚完成一个阶段 | 🍳 蛋炒饭 | 复盘对齐 |
+| 下一步不明朗 | 🍗 黄焖鸡米饭 | 规划排布 |
+| 连续高强度、无单一缺口 | 🥡 沙县三件套 | 复盘 + 规划 |
 
-想更勤快地吃：`EAT_RICE_THRESHOLD=5`。想少吃点：`EAT_RICE_COOLDOWN_MIN=30`。
+## 更新与移除
 
-## 工作原理
-
-```
-你 ←—— 对话 ——→ Agent
-                   │
-                   ├─ 连续 N 轮工具调用（PostToolUse hook 计数）
-                   │
-                   ▼ 阈值命中
-              【第一幕·宣示】"我去吃个饭🍚"
-                   │
-              【第二幕·真实的饭】联网检索
-                   ├─ 菜色A：素材收集（≤5 查询 + ≤3 深读）
-                   └─ 菜色B：事实核查（硬断言逐条 ✅⚠️❌）
-                   │
-              【第三幕·回归】"吃饱了🍚" + 汇报 + 立刻继续主线
-```
-
-hook 是 **nudge 不是强制**：注入的提醒保留了判断余地——若当前检索对主线无明确增量、或刚吃过，agent 会跳过本次（反表演原则）。毕竟每 8 轮必吃一次，就成另一种表演了。
-
-## 给 AI Agent 的使用说明（如果你是 agent，读这里）
-
-**这是什么**：一个 Claude Code 系 skill（SKILL.md 格式，纯 Markdown + 一个 Node hook 脚本），让 agent 在长任务中自然地说"我去吃个饭🍚"，并用那几分钟真实干活（检索/核查/复盘/规划），回来汇报成果继续主线。
-
-**怎么安装（按你的客户端对号入座）**：
-
-| 你的环境 | 安装方式 |
-|---|---|
-| Claude Code / 任何读 `~/.claude/skills/` 的 agent | 把本仓库放进 `~/.claude/skills/eat-rice/`，可选配置 hook（见下） |
-| WorkBuddy / 任何读 `~/.workbuddy/skills/` 的 agent | 放进 `~/.workbuddy/skills/eat-rice/`，同上 |
-| 其他 IDE agent（Codex / Cursor / Trae / Gemini CLI 等） | 没有 skill 目录机制也没关系——直接把 `SKILL.md` 全文读进上下文（或贴进你的系统提示 / rules 文件），行为规范即生效 |
-| 想要自动触发 | 需客户端支持 Claude Code 式 hooks（PostToolUse 事件）：往 `settings.json` 注入 `hooks.PostToolUse` 指向 `hooks/eat-rice-nudge.cjs`（需 Node ≥16）；不支持 hooks 的环境用关键词手动触发 |
-
-**触发逻辑**：
-- 自动：hook 计数，连续 ≥8 轮工具调用未与用户对话 → 注入"该吃饭了"提醒（阈值用环境变量 `EAT_RICE_THRESHOLD` 调，冷却 `EAT_RICE_COOLDOWN_MIN`）
-- 手动：用户说出"去吃饭吧 / 吃个饭再继续 / 干饭去"，或 agent 自判命中触发条件
-
-**运行逻辑（三幕剧）**：
-1. **宣示**——说"我去吃个饭🍚"+ 说清这餐吃什么菜
-2. **路由**——按任务当下最大缺口选菜：🍜麻辣烫(素材收集) / 🥟饺子(事实核查) / 🍳蛋炒饭(复盘对齐) / 🍗黄焖鸡米饭(规划排布) / 🥡沙县三件套(复盘+规划)；用可用的搜索工具或纯思考完成
-3. **回归**——固定格式汇报"吃饱了🍚"（吃到什么 / 增量 / 下一口）+ 追加一条到 `meal-log.md` 账本 + **立刻接回主线**
-
-**红线**：没有空路由（每顿必须真实劳动）、不虚构成果、不开新任务、饭量控制（检索 ≤5 查询、≤3 深读）。
-
-**验证装好了**：让 agent 连续干 8+ 轮工具调用的活，看它是否自动说"我去吃个饭🍚"；或直接说"去吃饭吧"看是否进入三幕剧。
-
-## FAQ
-
-**Q：没有联网搜索工具能用吗？**
-能。路由器会自动改吃思考类菜（复盘饭/规划饭），零外部依赖。检索饭只是菜单之一。
-
-**Q：不想自动触发，只想手动玩？**
-不装 hook 就行。说"去吃饭吧"/"吃个饭再继续"/"干饭去"，agent 也会进三幕剧。
-
-**Q：agent 会不会借吃饭摸鱼、编搜索结果？**
-红线第一条就是"不许端空盘子编饭"：查不到必须如实说"这家店没这个菜"，虚构搜索结果 = 端空盘子。饭量也有硬上限（查询≤5、深读≤3），一顿撑不死上下文。
-
-**Q：卸载？**
+更新：
 
 ```bash
-bash ~/.claude/skills/eat-rice/uninstall.sh   # 或 uninstall.ps1（Windows）
+git -C <skills-root>/eat-rice pull --ff-only
 ```
 
-会精确移除 hook 配置（不动你其他 hook），并询问是否删除 skill 目录。
+移除前，先删除宿主配置里指向 `eat-rice-nudge.cjs` 的 hook 条目；然后删除 `eat-rice` 目录。不要按模糊文件名批量删除其他 hooks。
+
+## 参考
+
+- [Agent Skills 开放规范：跨客户端目录约定](https://agentskills.io/client-implementation/adding-skills-support)
+- [OpenAI Skills：Codex 安装方式与目录结构](https://github.com/openai/skills)
+- [Anthropic Skills：Claude Code Skill / Plugin 示例](https://github.com/anthropics/skills)
+- [GitHub Copilot Agent Skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills)
+- [DeepSeek Harness 本地 Skill provider](https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/skill/skill-filesystem)
 
 ## License
 

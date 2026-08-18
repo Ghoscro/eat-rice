@@ -4,7 +4,7 @@
  *
  * 机制：
  * 1. 每次 PostToolUse 事件计数 +1（按 session_id 隔离）
- * 2. 连续 >= THRESHOLD 轮工具调用未与用户对话 → 向 agent 注入
+ * 2. 累计 >= THRESHOLD 次 PostToolUse 事件 → 向 agent 注入
  *    additionalContext："该吃饭了"，agent 按 eat-rice skill 三幕剧执行
  * 3. 注入后计数清零 + 冷却 COOLDOWN_MS，防刷屏
  * 4. hook 是 nudge 不是强制：context 里保留"检索无增量可跳过"的判断余地
@@ -16,8 +16,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const THRESHOLD = 8;        // 连续 N 轮工具调用 → 提醒吃饭
-const COOLDOWN_MS = 10 * 60 * 1000; // 两次提醒最小间隔 10 分钟
+const THRESHOLD = 8;
+const COOLDOWN_MS = 10 * 60 * 1000;
 
 const STATE_FILE = path.join(__dirname, "state.json");
 
@@ -54,8 +54,8 @@ process.stdin.on("end", () => {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
       additionalContext:
-        "🍚 eat-rice 自动触发：本会话已连续 " + THRESHOLD + "+ 轮工具调用未与用户对话。" +
-        "按 eat-rice skill（skills/eat-rice/SKILL.md）进入吃饭流程——吃饭是路由器，按任务当下最大缺口选菜：" +
+        "🍚 eat-rice 自动触发：本会话已累计 " + THRESHOLD + "+ 次 PostToolUse 事件。" +
+        "按已加载的 eat-rice skill 进入吃饭流程——吃饭是路由器，按任务当下最大缺口选菜：" +
         "① 宣示'我去吃个饭🍚'（说清路由到什么菜）→ " +
         "② 吃真实的一餐：🍜麻辣烫=素材收集(缺外部信息) / 🥟饺子=事实核查(产出有硬断言) / 🍳蛋炒饭=复盘对齐(刚完成阶段) / 🍗黄焖鸡米饭=规划排布(下步不明) / 🥡沙县三件套=复盘+规划(无明显单一缺口) → " +
         "③ 汇报'吃饱了🍚'+ 记 meal-log.md 账本 + 立刻接回主线。" +
